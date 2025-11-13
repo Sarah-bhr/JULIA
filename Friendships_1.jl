@@ -15,7 +15,7 @@ const Population=Vector{Person}
 #genere une population
 export Population, relationships!, Person
 
-# Générer une population
+# Générer une population (5valeurs, 3 émotions)
 
 function Population(n::Int)
     [Person(i, rand(5), rand(3), Int[]) for i in 1:n]
@@ -35,7 +35,7 @@ function relationships!(people::Population,prob::Float64=0.5)
         end
     end
 end
- 
+ #au début j'avais mis push mais finalement on a mis union pour éviter les doublons
 function similarity(p1::Person, p2::Person)
     return 1 - norm(p1.values - p2.values)/sqrt(length(p1.values))
 end

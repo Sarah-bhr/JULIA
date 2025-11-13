@@ -1,44 +1,56 @@
-#Ce module gère la dynamique des relations :
-#comment les amitiés évoluent avec le temps, en fonction de la compatibilité entre individus.
 module Simulation
 
 using Random
 using LinearAlgebra
-include("Friendships.jl")   
-using .Friendships      
 
-mutable struct FriendshipScore
-    i::Int
-    j::Int
-    score::Float64
-end
+include("Friendships.jl")
+using .Friendships
 
+export simulate!
 
-function init_friendships(people::Population)
-    relations = FriendshipScore[]
-    for i in 1:(length(people)-1)
-        for j in (i+1):length(people)
-            push!(relations, FriendshipScore(i, j, rand()))
+"""
+    simulate!(people; steps=100, α=0.6, β=0.25, γ=0.1, seuil=0.7)
+
+Simule l’évolution sociale :
+1. Mise à jour des intensités relationnelles via `poidsM`
+2. Mise à jour des amitiés selon intensité
+3. Influence émotionnelle entre amis forts
+"""
+function simulate!(people::Population;
+                   steps=100,
+                   α=0.6, β=0.25, γ=0.1,
+                   seuil=0.7)
+
+    # On initialise les intensités du module Friendships
+    poids = poids0(people)
+
+    for t in 1:steps
+
+        # 1️⃣ Mise à jour des intensités (Friendships)
+        poidsM(poids, people; alpha=α, beta=β, gamma=γ)
+
+        # 2️⃣ Mise à jour automatique des amitiés
+        for ((i,j), (intensite, _)) in poids
+            if intensite > seuil
+                # ils deviennent amis si ce n'est pas déjà le cas
+                people[i].friends = union(people[i].friends, [j])
+                people[j].friends = union(people[j].friends, [i])
+            else
+                # amitié trop faible : rupture possible
+                people[i].friends = setdiff(people[i].friends, [j])
+                people[j].friends = setdiff(people[j].friends, [i])
+            end
+        end
+
+        # 3️⃣ Influence émotionnelle entre amis forts
+        for ((i,j), (intensite,_)) in poids
+            if intensite > seuil
+                influence!(people[i], people[j], poids; alpha=α, beta=β, gamma=γ)
+            end
         end
     end
-    return relations
-end
 
-function update_friendship!(rel::FriendshipScore, ind1::Person, ind2::Person;
-                            α=0.8, β=0.15, γ=0.05)
-    compat = dot(ind1.values, ind2.values) / (norm(ind1.values) * norm(ind2.values))
-    delta = α * rel.score + β * compat + γ * randn() * 0.1
-    rel.score = clamp(delta, 0, 1)
+    return poids
 end
-#L’amitié augmente si les valeurs sont compatibles, mais peut varier aléatoirement selon les émotions et le hasard.
-function simulate!(people::Population, relations::Vector{FriendshipScore}, steps::Int=100)
-    for _ in 1:steps
-        for rel in relations
-            update_friendship!(rel, people[rel.i], people[rel.j])
-        end
-    end
-end
-
-export FriendshipScore, init_friendships, update_friendship!, simulate!
 
 end
